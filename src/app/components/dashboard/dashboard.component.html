@@ -1,0 +1,135 @@
+<div class="dashboard-wrapper">
+  <header class="top-bar">
+    <div class="brand">
+      <div class="logo">
+        <span class="logo-icon">🚆</span>
+        <div>
+          <h1 class="system-title">BtrackUS</h1>
+          <span class="system-status">
+            <span class="dot"></span>Sistema Operativo
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="user-actions">
+      <div class="user-profile">
+        <div class="user-info">
+          <span class="user-name">Daniel Santana</span>
+        </div>
+        <img
+          src="https://i.pravatar.cc/150?u=alex"
+          alt="Profile"
+          class="avatar"
+        />
+      </div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <aside class="sidebar-left">
+      <h2 class="section-title">RUTAS ACTIVAS</h2>
+
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input
+          type="text"
+          placeholder="Buscar líneas o IDs de autobuses..."
+          [(ngModel)]="searchQuery"
+        />
+      </div>
+
+      <div class="filter-chips">
+        @for (f of ["Todos", "Retrasado", "A Tiempo"]; track f) {
+          <button [class.active]="activeFilter === f" (click)="setFilter(f)">
+            {{ f }}
+          </button>
+        }
+      </div>
+
+      <div class="lines-list">
+        @for (line of filteredLines; track line.id) {
+          <div
+            class="line-card"
+            [class.selected]="selectedBus.id === line.id"
+            (click)="selectLine(line)"
+          >
+            <div class="line-icon-box">{{ line.icon }}</div>
+            <div class="line-info">
+              <span class="line-name">{{ line.name }}</span>
+              <span class="line-status" [ngClass]="line.type"
+                >● {{ line.status }}</span
+              >
+            </div>
+            <span class="arrow">›</span>
+          </div>
+        }
+      </div>
+    </aside>
+
+    <section class="map-container">
+      <div id="map" style="height: 100%; width: 100%"></div>
+
+      <div
+        class="map-controls"
+        style="position: absolute; z-index: 1000; top: 20px; left: 20px"
+      >
+        <button (click)="zoomIn()">+</button>
+        <button (click)="zoomOut()">−</button>
+        <button>🗺️</button>
+      </div>
+    </section>
+
+    <aside class="sidebar-right">
+      <div class="vehicle-header">
+        <div>
+          <h3>Bus {{ selectedBus.id }}</h3>
+          <p>{{ selectedBus.route }}</p>
+        </div>
+        <span class="status-badge" [ngClass]="selectedBus.type">{{
+          selectedBus.status
+        }}</span>
+      </div>
+
+      <div class="driver-card">
+        <img
+          src="https://i.pravatar.cc/150?u=john"
+          alt="Driver"
+          class="driver-img"
+        />
+        <div class="driver-details">
+          <h4>{{ selectedBus.driver }}</h4>
+          <p>
+            ID: {{ selectedBus.driverId }} • Fin de turno en
+            {{ selectedBus.shiftEnd }}
+          </p>
+        </div>
+        <button class="call-btn">📞</button>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-item">
+          <span class="stat-label">VELOCIDAD</span>
+          <span class="stat-value">{{ selectedBus.speed }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">CARGA</span>
+          <span class="stat-value">{{ selectedBus.load }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">PRÓXIMA PARADA</span>
+          <span class="stat-value">5m</span>
+        </div>
+      </div>
+
+      <div class="approaching-stop">
+        <div class="progress-bar">
+          <div
+            class="progress-fill"
+            [style.width.%]="selectedBus.progress"
+          ></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+</div>

@@ -1,0 +1,152 @@
+<div class="dashboard-wrapper">
+  <header class="top-bar">
+    <div class="brand">
+      <div class="logo">
+        <span class="logo-icon">🚆</span>
+        <div>
+          <h1 class="system-title">BtrackUS</h1>
+          <span class="system-status"
+            ><span class="dot"></span>Administración de Flota</span
+          >
+        </div>
+      </div>
+    </div>
+    <div class="user-actions">
+      <span class="user-name">Daniel Santana</span>
+      <img src="https://i.pravatar.cc/150?u=alex" class="avatar" />
+    </div>
+  </header>
+
+  <main class="main-content">
+    <aside class="sidebar-left">
+      <div class="header-section">
+        <h2 class="section-title">UNIDADES REGISTRADAS</h2>
+        <button
+          class="btn-add-circle"
+          (click)="resetForm()"
+          title="Agregar Nuevo"
+        >
+          +
+        </button>
+      </div>
+
+      <div class="search-box">
+        <lucide-icon [img]="SearchIcon" class="icon-sm"></lucide-icon>
+        <input
+          type="text"
+          placeholder="Filtrar por ID o ruta..."
+          [(ngModel)]="searchQuery"
+        />
+      </div>
+
+      <div class="lines-list">
+        @for (bus of filteredBuses; track bus.id) {
+          <div
+            class="line-card"
+            [class.selected]="currentBus.id === bus.id"
+            (click)="editBus(bus)"
+          >
+            <div class="line-icon-box">
+              <lucide-icon [img]="BusIcon"></lucide-icon>
+            </div>
+            <div class="line-info">
+              <span class="line-name">{{ bus.id }} - {{ bus.name }}</span>
+              <span class="line-status" [ngClass]="bus.type"
+                >● {{ bus.driver }}</span
+              >
+            </div>
+            <lucide-icon
+              [img]="ChevronRightIcon"
+              class="arrow-icon"
+            ></lucide-icon>
+          </div>
+        }
+      </div>
+    </aside>
+
+    <section class="form-container">
+      <div class="form-header">
+        <h2>{{ isEditing ? "Editar Unidad" : "Nueva Unidad" }}</h2>
+        <p>Ajuste los parámetros técnicos y de personal de la unidad.</p>
+      </div>
+
+      <div class="form-grid">
+        <div class="input-group">
+          <label>ID del Autobús</label>
+          <input
+            type="text"
+            [(ngModel)]="currentBus.id"
+            [disabled]="isEditing"
+            placeholder="Ej: 506"
+          />
+        </div>
+        <div class="input-group">
+          <label>Nombre de Ruta</label>
+          <input
+            type="text"
+            [(ngModel)]="currentBus.name"
+            placeholder="Ej: Grecia / Maipú"
+          />
+        </div>
+        <div class="input-group">
+          <label>Conductor Asignado</label>
+          <input type="text" [(ngModel)]="currentBus.driver" />
+        </div>
+        <div class="input-group">
+          <label>ID Conductor</label>
+          <input type="text" [(ngModel)]="currentBus.driverId" />
+        </div>
+        <div class="input-group full-width">
+          <label>Estado Inicial</label>
+          <select [(ngModel)]="currentBus.type" class="custom-select">
+            <option value="ontime">A Tiempo (Verde)</option>
+            <option value="delayed">Retrasado (Rojo)</option>
+            <option value="warning">Precaución (Naranja)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn-secondary" (click)="resetForm()">Cancelar</button>
+        <button class="btn-primary" (click)="saveBus()">
+          <lucide-icon [img]="SaveIcon" class="icon-sm"></lucide-icon>
+          {{ isEditing ? "Actualizar Cambios" : "Registrar Bus" }}
+        </button>
+      </div>
+    </section>
+
+    <aside class="sidebar-right">
+      <h2 class="section-title">VISTA PREVIA</h2>
+
+      <div class="preview-card">
+        <div class="vehicle-header">
+          <h3>{{ currentBus.id || "---" }}</h3>
+          <span class="status-badge" [ngClass]="currentBus.type">{{
+            isEditing ? "Edición" : "Nuevo"
+          }}</span>
+        </div>
+        <p class="preview-route">
+          {{ currentBus.name || "Sin ruta definida" }}
+        </p>
+
+        <div class="driver-card mini">
+          <lucide-icon [img]="UserIcon"></lucide-icon>
+          <span>{{ currentBus.driver || "Sin conductor" }}</span>
+        </div>
+      </div>
+
+      @if (isEditing) {
+        <div class="danger-zone">
+          <h3>Zona de Peligro</h3>
+          <p>
+            Esta acción es irreversible. El bus dejará de reportar al sistema.
+          </p>
+          <button class="btn-danger" (click)="deleteBus(currentBus.id)">
+            <lucide-icon name="trash-2" class="icon-sm"></lucide-icon> Eliminar
+            Unidad
+          </button>
+        </div>
+      }
+    </aside>
+  </main>
+</div>

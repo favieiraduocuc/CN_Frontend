@@ -64,6 +64,7 @@ export class LandingPageComponent implements OnInit, OnDestroy {
         'User authenticated:',
         this.userAccount?.name || this.userAccount?.username,
       );
+      this.router.navigate(['/dashboard']);
     } else {
       console.log('No user authenticated');
     }
