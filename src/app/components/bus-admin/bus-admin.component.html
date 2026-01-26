@@ -11,9 +11,36 @@
         </div>
       </div>
     </div>
+    <div class="nav-links">
+      <a (click)="goToDashboard()" class="nav-item">Dashboard</a>
+    </div>
     <div class="user-actions">
-      <span class="user-name">Daniel Santana</span>
-      <img src="https://i.pravatar.cc/150?u=alex" class="avatar" />
+      <div class="user-profile-container">
+        <div class="user-profile" (click)="toggleProfile()">
+          <div class="user-info">
+            <span class="user-name">{{ fullName }}</span>
+            <lucide-icon
+              [img]="ChevronDownIcon"
+              [class.rotated]="isProfileOpen"
+            ></lucide-icon>
+          </div>
+          <img
+            src="https://i.pravatar.cc/150?u=alex"
+            alt="Profile"
+            class="avatar"
+          />
+        </div>
+
+        @if (isProfileOpen) {
+          <div class="profile-dropdown">
+            <div class="dropdown-header">{{ fullName }}</div>
+            <button class="dropdown-item" (click)="logout()">
+              <lucide-icon [img]="LogOutIcon"></lucide-icon>
+              Cerrar Sesión
+            </button>
+          </div>
+        }
+      </div>
     </div>
   </header>
 
@@ -43,16 +70,16 @@
         @for (bus of filteredBuses; track bus.id) {
           <div
             class="line-card"
-            [class.selected]="currentBus.id === bus.id"
+            [class.selected]="busForm.get('id')?.value === bus.id"
             (click)="editBus(bus)"
           >
             <div class="line-icon-box">
               <lucide-icon [img]="BusIcon"></lucide-icon>
             </div>
             <div class="line-info">
-              <span class="line-name">{{ bus.id }} - {{ bus.name }}</span>
-              <span class="line-status" [ngClass]="bus.type"
-                >● {{ bus.driver }}</span
+              <span class="line-name">{{ bus.id }} - {{ bus.lineName }}</span>
+              <span class="line-status" [ngClass]="bus.status"
+                >● {{ bus.status }}</span
               >
             </div>
             <lucide-icon
@@ -67,44 +94,63 @@
     <section class="form-container">
       <div class="form-header">
         <h2>{{ isEditing ? "Editar Unidad" : "Nueva Unidad" }}</h2>
-        <p>Ajuste los parámetros técnicos y de personal de la unidad.</p>
+        <p>Todos los campos son obligatorios para el registro.</p>
       </div>
 
-      <div class="form-grid">
+      <form [formGroup]="busForm" class="form-grid">
         <div class="input-group">
-          <label>ID del Autobús</label>
+          <label>Patente</label>
           <input
             type="text"
-            [(ngModel)]="currentBus.id"
-            [disabled]="isEditing"
-            placeholder="Ej: 506"
+            formControlName="plate"
+            placeholder="Ej: ABC-123"
+            [class.error]="
+              busForm.get('plate')?.invalid && busForm.get('plate')?.touched
+            "
           />
+          @if (busForm.get("plate")?.invalid && busForm.get("plate")?.touched) {
+            <span class="error-message"
+              >Formato de patente inválido (Ej: AA11-22)</span
+            >
+          }
         </div>
-        <div class="input-group">
+
+        <div class="input-group full-width">
           <label>Nombre de Ruta</label>
           <input
             type="text"
-            [(ngModel)]="currentBus.name"
+            formControlName="lineName"
             placeholder="Ej: Grecia / Maipú"
+            [class.error]="
+              busForm.get('lineName')?.invalid &&
+              busForm.get('lineName')?.touched
+            "
           />
+          @if (
+            busForm.get("lineName")?.invalid && busForm.get("lineName")?.touched
+          ) {
+            <span class="error-message"
+              >Debe ingresar el nombre de la ruta</span
+            >
+          }
         </div>
-        <div class="input-group">
-          <label>Conductor Asignado</label>
-          <input type="text" [(ngModel)]="currentBus.driver" />
-        </div>
-        <div class="input-group">
-          <label>ID Conductor</label>
-          <input type="text" [(ngModel)]="currentBus.driverId" />
-        </div>
+
         <div class="input-group full-width">
-          <label>Estado Inicial</label>
-          <select [(ngModel)]="currentBus.type" class="custom-select">
-            <option value="ontime">A Tiempo (Verde)</option>
-            <option value="delayed">Retrasado (Rojo)</option>
-            <option value="warning">Precaución (Naranja)</option>
+          <label>Estado de Operación</label>
+          <select
+            formControlName="status"
+            class="custom-select"
+            [class.error]="
+              busForm.get('status')?.invalid && busForm.get('status')?.touched
+            "
+          >
+            <option value="ACTIVE">Activo</option>
+            <option value="IN_SERVICE">En Servicio</option>
+            <option value="MAINTENANCE">En Mantenimiento</option>
+            <option value="OFFLINE">Fuera de Servicio</option>
           </select>
         </div>
-      </div>
+      </form>
 
       <div class="form-actions">
         <button class="btn-secondary" (click)="resetForm()">Cancelar</button>
@@ -120,30 +166,28 @@
 
       <div class="preview-card">
         <div class="vehicle-header">
-          <h3>{{ currentBus.id || "---" }}</h3>
-          <span class="status-badge" [ngClass]="currentBus.type">{{
-            isEditing ? "Edición" : "Nuevo"
-          }}</span>
+          <h3>{{ busForm.get("id")?.value || "---" }}</h3>
+          <span class="status-badge" [ngClass]="busForm.get('status')?.value">
+            {{ busForm.get("status")?.value }}
+          </span>
         </div>
         <p class="preview-route">
-          {{ currentBus.name || "Sin ruta definida" }}
+          {{ busForm.get("lineName")?.value || "Sin ruta definida" }}
         </p>
-
-        <div class="driver-card mini">
-          <lucide-icon [img]="UserIcon"></lucide-icon>
-          <span>{{ currentBus.driver || "Sin conductor" }}</span>
-        </div>
+        <small style="color: var(--text-secondary)"
+          >Patente: {{ busForm.get("plate")?.value || "---" }}</small
+        >
       </div>
 
       @if (isEditing) {
         <div class="danger-zone">
           <h3>Zona de Peligro</h3>
-          <p>
-            Esta acción es irreversible. El bus dejará de reportar al sistema.
-          </p>
-          <button class="btn-danger" (click)="deleteBus(currentBus.id)">
-            <lucide-icon name="trash-2" class="icon-sm"></lucide-icon> Eliminar
-            Unidad
+          <button
+            class="btn-danger"
+            (click)="deleteBus(busForm.get('id')?.value)"
+          >
+            <lucide-icon [img]="Trash2Icon" class="icon-sm"></lucide-icon>
+            Eliminar Unidad
           </button>
         </div>
       }

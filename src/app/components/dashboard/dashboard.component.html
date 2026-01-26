@@ -5,23 +5,43 @@
         <span class="logo-icon">🚆</span>
         <div>
           <h1 class="system-title">BtrackUS</h1>
-          <span class="system-status">
-            <span class="dot"></span>Sistema Operativo
-          </span>
+          <span class="system-status"
+            ><span class="dot"></span>Sistema Operativo</span
+          >
         </div>
       </div>
     </div>
 
+    <div class="nav-links">
+      <a (click)="goToBusAdmin()" class="nav-item">Administrar Buses</a>
+    </div>
+
     <div class="user-actions">
-      <div class="user-profile">
-        <div class="user-info">
-          <span class="user-name">Daniel Santana</span>
+      <div class="user-profile-container">
+        <div class="user-profile" (click)="toggleProfile()">
+          <div class="user-info">
+            <span class="user-name">{{ fullName }}</span>
+            <lucide-icon
+              [img]="ChevronDownIcon"
+              [class.rotated]="isProfileOpen"
+            ></lucide-icon>
+          </div>
+          <img
+            src="https://i.pravatar.cc/150?u=alex"
+            alt="Profile"
+            class="avatar"
+          />
         </div>
-        <img
-          src="https://i.pravatar.cc/150?u=alex"
-          alt="Profile"
-          class="avatar"
-        />
+
+        @if (isProfileOpen) {
+          <div class="profile-dropdown">
+            <div class="dropdown-header">{{ fullName }}</div>
+            <button class="dropdown-item" (click)="logout()">
+              <lucide-icon [img]="LogOutIcon"></lucide-icon>
+              Cerrar Sesión
+            </button>
+          </div>
+        }
       </div>
     </div>
   </header>
@@ -40,7 +60,16 @@
       </div>
 
       <div class="filter-chips">
-        @for (f of ["Todos", "Retrasado", "A Tiempo"]; track f) {
+        @for (
+          f of [
+            "Todos",
+            "Activo",
+            "En Servicio",
+            "En Mantenimiento",
+            "Offline",
+          ];
+          track f
+        ) {
           <button [class.active]="activeFilter === f" (click)="setFilter(f)">
             {{ f }}
           </button>
@@ -54,10 +83,12 @@
             [class.selected]="selectedBus.id === line.id"
             (click)="selectLine(line)"
           >
-            <div class="line-icon-box">{{ line.icon }}</div>
+            <div class="line-icon-box">
+              <lucide-icon [img]="BusIcon"></lucide-icon>
+            </div>
             <div class="line-info">
-              <span class="line-name">{{ line.name }}</span>
-              <span class="line-status" [ngClass]="line.type"
+              <span class="line-name">{{ line.lineName }}</span>
+              <span class="line-status" [ngClass]="line.status"
                 >● {{ line.status }}</span
               >
             </div>
@@ -93,7 +124,7 @@
 
       <div class="driver-card">
         <img
-          src="https://i.pravatar.cc/150?u=john"
+          src="https://i.pravatar.cc/150?u=daniel"
           alt="Driver"
           class="driver-img"
         />

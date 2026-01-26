@@ -4,16 +4,19 @@ import {
   AfterViewInit,
   OnDestroy,
   inject,
+  ChangeDetectorRef,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import * as L from 'leaflet';
-import { LucideAngularModule } from 'lucide-angular';
+import { LucideAngularModule, ChevronDown, LogOut, Bus } from 'lucide-angular';
 import { AccountInfo, AuthenticationResult } from '@azure/msal-browser';
 import { MsalService } from '@azure/msal-angular';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
+import { VehicleService } from '../../services/vehicles/vehicle.service';
+import { Vehicle, VehicleStatus } from '../../models/vehicle.model';
 
 @Component({
   selector: 'app-dashboard',
@@ -33,67 +36,53 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private map!: L.Map;
   private markers: L.Marker[] = [];
 
+  readonly ChevronDownIcon = ChevronDown;
+  readonly LogOutIcon = LogOut;
+  readonly BusIcon = Bus;
+
   private authService = inject(MsalService);
   private router = inject(Router);
-  private http = inject(HttpClient);
+  private vehicleService = inject(VehicleService);
+  private cdr = inject(ChangeDetectorRef);
 
-  lines = [
-    {
-      id: '506',
-      name: '506 - Grecia / Maipú',
-      status: 'Retrasado (+5m)',
-      type: 'delayed',
-      icon: '🚌',
-      lat: -33.457,
-      lng: -70.605,
-      speed: '22 km/h',
-      load: '85%',
-    },
-    {
-      id: '401',
-      name: '401 - Providencia / Las Condes',
-      status: 'A Tiempo',
-      type: 'ontime',
-      icon: '🚌',
-      lat: -33.4372,
-      lng: -70.6341,
-      speed: '35 km/h',
-      load: '40%',
-    },
-    {
-      id: '210',
-      name: '210 - Alameda / Est. Central',
-      status: 'A Tiempo',
-      type: 'ontime',
-      icon: '🚌',
-      lat: -33.4513,
-      lng: -70.6785,
-      speed: '28 km/h',
-      load: '90%',
-    },
-    {
-      id: 'B27',
-      name: 'B27 - Vespucio Norte',
-      status: 'Tráfico Lento',
-      type: 'warning',
-      icon: '🚌',
-      lat: -33.385,
-      lng: -70.632,
-      speed: '12 km/h',
-      load: '30%',
-    },
-  ];
+  isProfileOpen = false;
+  fullName: string = '';
 
-  selectedBus: any = {
-    ...this.lines[0],
-    route: this.lines[0].name,
-    driver: 'Daniel',
-    driverId: 'DS-2026',
-    shiftEnd: '3h',
-    progress: Math.floor(Math.random() * 100),
-  };
+  lines: Vehicle[] = [];
 
-  ngOnInit() {}
+  selectedBus: any;
+
+  ngOnInit() {
+    this.loadUserInfo();
+    this.loadVehicles();
+  }
+
+  async loadVehicles(): Promise<void> {
+    this.vehicleService.getAll().subscribe({
+      next: (response) => {
+        if (response) {
+          this.lines = response;
+          console.log('Vehículos cargados:', this.lines);
+
+          if (this.map) {
+            this.renderMarkers();
+            this.map.invalidateSize();
+          }
+
+          if (this.lines.length > 0) {
+            this.selectLine(this.lines[0]);
+          }
+          this.cdr.detectChanges();
+        }
+      },
+      error: (err) => {
+        console.error('Error al cargar vehículos:', err);
+        this.authService.logoutRedirect({
+          postLogoutRedirectUri: 'http://localhost:4200',
+        });
+      },
+    });
+  }
 
   ngAfterViewInit() {
     this.initMap();
@@ -114,34 +103,30 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     ).addTo(this.map);
 
     this.renderMarkers();
+
+    setTimeout(() => {
+      this.map.invalidateSize();
+      this.cdr.detectChanges();
+    }, 100);
   }
 
   loadUserInfo(): void {
-    try {
-      const accounts = this.authService.instance.getAllAccounts();
-      if (accounts.length > 0) {
-        this.userAccount = accounts[0];
-        console.log('Cargando usuario:', this.userAccount);
-        this.authService.instance.setActiveAccount(this.userAccount);
-        console.log(
-          'Usuario activo:',
-          this.authService.instance.getActiveAccount(),
-        );
-        this.idTokenClaims = this.userAccount.idTokenClaims;
+    const activeAccount = this.authService.instance.getActiveAccount();
+    const account =
+      activeAccount || this.authService.instance.getAllAccounts()[0];
 
-        const activeAccount = this.authService.instance.getActiveAccount();
-        if (activeAccount) {
-          this.rawIdToken = (activeAccount as any).idToken || '';
-        }
+    if (account) {
+      this.userAccount = account;
+      this.authService.instance.setActiveAccount(account);
+      this.idTokenClaims = account.idTokenClaims;
 
-        console.log('Usuario cargado:', this.userAccount);
-        console.log('ID Token Claims:', this.idTokenClaims);
-        this.getAccessToken();
-      } else {
-        this.router.navigate(['/']);
+      if (this.idTokenClaims) {
+        this.fullName =
+          this.idTokenClaims.name ||
+          `${this.idTokenClaims.given_name} ${this.idTokenClaims.family_name}`;
       }
-    } catch (error) {
-      console.error('Error al cargar información del usuario:', error);
+      this.getAccessToken();
+    } else {
       this.router.navigate(['/']);
     }
   }
@@ -155,30 +140,34 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       .subscribe({
         next: (result: AuthenticationResult) => {
           this.accessToken = result.accessToken;
-          console.log('Access Token obtenido:', this.accessToken);
           console.log('Scopes:', result.scopes);
-          console.log('Expira en:', result.expiresOn);
+          console.log('Expires in:', result.expiresOn);
         },
         error: (error) => {
-          console.error('Error al obtener access token:', error);
+          console.error('Error getting access token:', error);
 
-          // Intentar con login interactivo si falla el silencioso
-          this.authService.acquireTokenRedirect({
-            scopes: [environment.msalClientId],
+          this.authService.logoutRedirect({
+            postLogoutRedirectUri: 'http://localhost:4200',
           });
         },
       });
   }
 
   private renderMarkers() {
+    if (!this.map || !this.lines.length) return;
+
+    // Limpiar marcadores antiguos si existen
+    this.markers.forEach((marker) => this.map.removeLayer(marker));
+    this.markers = [];
+
     this.lines.forEach((line) => {
       const customIcon = L.divIcon({
         className: 'custom-leaflet-marker',
         html: `
         <div class="marker-wrapper">
           <div class="bus-label">${line.id}</div>
-          <div class="bus-icon-container ${line.type}">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bus"><rect width="16" height="16" x="4" y="3" rx="2"/><path d="M4 11h16"/><path d="M8 15h.01"/><path d="M16 15h.01"/><path d="M6 19v2"/><path d="M18 19v2"/></svg>
+          <div class="bus-icon-container ${line.status}">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="lucide lucide-bus"><rect width="16" height="16" x="4" y="3" rx="2"/><path d="M4 11h16"/><path d="M8 15h.01"/><path d="M16 15h.01"/><path d="M6 19v2"/><path d="M18 19v2"/></svg>
           </div>
         </div>
       `,
@@ -186,36 +175,48 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         iconAnchor: [20, 50],
       });
 
-      L.marker([line.lat, line.lng], { icon: customIcon })
+      const marker = L.marker([line.latitude, line.longitude], {
+        icon: customIcon,
+      })
         .addTo(this.map)
         .on('click', () => this.selectLine(line));
+
+      this.markers.push(marker);
     });
   }
 
   get filteredLines() {
     return this.lines.filter((line) => {
       const matchesSearch =
-        line.name.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+        line.lineName.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
         line.id.toLowerCase().includes(this.searchQuery.toLowerCase());
       const matchesFilter =
         this.activeFilter === 'Todos' ||
-        (this.activeFilter === 'Retrasado' && line.type === 'delayed') ||
-        (this.activeFilter === 'A Tiempo' && line.type === 'ontime');
+        (this.activeFilter === 'En Servicio' &&
+          line.status === VehicleStatus.IN_SERVICE) ||
+        (this.activeFilter === 'En Mantenimiento' &&
+          line.status === VehicleStatus.MAINTENANCE) ||
+        (this.activeFilter === 'Activo' &&
+          line.status === VehicleStatus.ACTIVE) ||
+        (this.activeFilter === 'Offline' &&
+          line.status === VehicleStatus.OFFLINE);
       return matchesSearch && matchesFilter;
     });
   }
 
-  selectLine(line: any) {
+  selectLine(line: Vehicle) {
     this.selectedBus = {
       ...line,
-      route: line.name,
+      route: line.lineName,
       driver: 'Daniel',
       driverId: 'DS-2026',
       shiftEnd: '3h',
+      speed: Math.floor(Math.random() * 100),
+      load: Math.floor(Math.random() * 100),
       progress: Math.floor(Math.random() * 100),
     };
 
-    this.map.flyTo([line.lat, line.lng], 15);
+    this.map.flyTo([line.latitude, line.longitude], 15);
   }
 
   setFilter(filter: string) {
@@ -227,6 +228,20 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
   zoomOut() {
     this.map.zoomOut();
+  }
+
+  goToBusAdmin() {
+    this.router.navigate(['/bus-admin']);
+  }
+
+  logout(): void {
+    this.authService.logoutRedirect({
+      postLogoutRedirectUri: 'http://localhost:4200',
+    });
+  }
+
+  toggleProfile() {
+    this.isProfileOpen = !this.isProfileOpen;
   }
 
   ngOnDestroy() {

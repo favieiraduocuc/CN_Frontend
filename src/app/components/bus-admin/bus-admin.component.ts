@@ -1,6 +1,12 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import {
+  FormsModule,
+  ReactiveFormsModule,
+  FormBuilder,
+  FormGroup,
+  Validators,
+} from '@angular/forms';
 import {
   LucideAngularModule,
   Search,
@@ -10,36 +16,39 @@ import {
   User,
   Trash2,
   Plus,
+  ChevronDown,
+  LogOut,
 } from 'lucide-angular';
 import { AccountInfo, AuthenticationResult } from '@azure/msal-browser';
 import { MsalService } from '@azure/msal-angular';
-import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
-
-interface Bus {
-  id: string;
-  name: string;
-  driver: string;
-  driverId: string;
-  type: 'ontime' | 'delayed' | 'warning';
-  lat: number;
-  lng: number;
-  status: string;
-}
+import { Vehicle, VehicleStatus } from '../../models/vehicle.model';
+import { VehicleService } from '../../services/vehicles/vehicle.service';
 
 @Component({
   selector: 'app-bus-admin',
   standalone: true,
-  imports: [CommonModule, FormsModule, LucideAngularModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    LucideAngularModule,
+    ReactiveFormsModule,
+  ],
   templateUrl: './bus-admin.component.html',
   styleUrls: ['./bus-admin.component.css'],
 })
 export class BusAdminComponent implements OnInit {
+  busForm!: FormGroup;
+  private fb = inject(FormBuilder);
+
   userAccount: AccountInfo | null = null;
   idTokenClaims: any = null;
   rawIdToken: string = '';
   accessToken: string = '';
+
+  fullName: string = '';
+  isProfileOpen: boolean = false;
 
   searchQuery: string = '';
   isEditing: boolean = false;
@@ -50,91 +59,97 @@ export class BusAdminComponent implements OnInit {
   readonly Trash2Icon = Trash2;
   readonly PlusIcon = Plus;
   readonly SearchIcon = Search;
+  readonly ChevronDownIcon = ChevronDown;
+  readonly LogOutIcon = LogOut;
 
   private authService = inject(MsalService);
   private router = inject(Router);
-  private http = inject(HttpClient);
+  private vehicleService = inject(VehicleService);
 
-  buses: Bus[] = [
-    {
-      id: '506',
-      name: 'Grecia / Maipú',
-      driver: 'Daniel Diaz',
-      driverId: 'DD-2026',
-      type: 'ontime',
-      lat: -33.457,
-      lng: -70.605,
-      status: 'Activo',
-    },
-    {
-      id: '401',
-      name: 'Providencia / Las Condes',
-      driver: 'Juan Pérez',
-      driverId: 'JP-1102',
-      type: 'delayed',
-      lat: -33.437,
-      lng: -70.634,
-      status: 'Retrasado',
-    },
-  ];
+  buses: Vehicle[] = [];
 
   // Objeto vinculado al formulario
-  currentBus: Bus = this.getEmptyBus();
+  currentBus: Vehicle = this.getEmptyBus();
 
   get filteredBuses() {
     return this.buses.filter(
       (b) =>
-        b.id.includes(this.searchQuery) ||
-        b.name.toLowerCase().includes(this.searchQuery.toLowerCase()),
+        b.id.toString().includes(this.searchQuery) ||
+        b.lineName.toLowerCase().includes(this.searchQuery.toLowerCase()),
     );
   }
 
-  getEmptyBus(): Bus {
+  getEmptyBus(): Vehicle {
     return {
       id: '',
-      name: '',
-      driver: '',
-      driverId: '',
-      type: 'ontime',
-      lat: -33.448,
-      lng: -70.669,
-      status: 'Nuevo',
+      plate: '',
+      lineName: '',
+      latitude: -33.448,
+      longitude: -70.669,
+      status: VehicleStatus.ACTIVE,
     };
   }
 
-  // CREATE / UPDATE
   saveBus() {
+    if (this.busForm.invalid) {
+      console.log('form invalid');
+      this.busForm.markAllAsTouched();
+      return;
+    }
+
+    const busData: Vehicle = this.busForm.getRawValue();
+
     if (this.isEditing) {
-      const index = this.buses.findIndex((b) => b.id === this.currentBus.id);
-      this.buses[index] = { ...this.currentBus };
+      const index = this.buses.findIndex((b) => b.id === busData.id);
+      this.vehicleService
+        .update(Number(busData.id), busData)
+        .subscribe((bus) => {
+          this.buses[index] = busData;
+        });
     } else {
-      // Validar si el ID ya existe
-      if (this.buses.find((b) => b.id === this.currentBus.id)) {
+      if (this.buses.find((b) => b.id === busData.id)) {
         alert('El ID del bus ya existe.');
         return;
       }
-      this.buses.push({ ...this.currentBus });
+      this.vehicleService.create(busData).subscribe((bus) => {
+        this.buses.push(bus);
+      });
     }
     this.resetForm();
   }
 
-  // READ (Cargar en formulario)
-  editBus(bus: Bus) {
+  editBus(bus: Vehicle) {
     this.isEditing = true;
-    this.currentBus = { ...bus };
+    this.busForm.patchValue(bus);
+    this.busForm.get('id')?.disable();
+    this.busForm.get('plate')?.disable();
   }
 
-  // DELETE
   deleteBus(id: string) {
-    if (confirm(`¿Está seguro de eliminar el bus ${id}?`)) {
-      this.buses = this.buses.filter((b) => b.id !== id);
-      if (this.currentBus.id === id) this.resetForm();
+    const confirmDelete = confirm(`¿Está seguro de eliminar el bus ${id}?`);
+    console.log('confirmDelete', confirmDelete);
+    if (confirmDelete) {
+      this.vehicleService.delete(Number(id)).subscribe(() => {
+        this.resetForm();
+        this.buses = this.buses.filter((b) => b.id !== id);
+      });
     }
   }
 
   resetForm() {
     this.isEditing = false;
-    this.currentBus = this.getEmptyBus();
+
+    this.busForm.get('id')?.enable();
+    this.busForm.get('plate')?.enable();
+
+    this.busForm.reset({
+      id: '',
+      plate: '',
+      lineName: '',
+      status: VehicleStatus.ACTIVE,
+      latitude: -33.448,
+      longitude: -70.669,
+    });
   }
 
   loadUserInfo(): void {
@@ -142,12 +157,7 @@ export class BusAdminComponent implements OnInit {
       const accounts = this.authService.instance.getAllAccounts();
       if (accounts.length > 0) {
         this.userAccount = accounts[0];
-        console.log('Cargando usuario:', this.userAccount);
         this.authService.instance.setActiveAccount(this.userAccount);
-        console.log(
-          'Usuario activo:',
-          this.authService.instance.getActiveAccount(),
-        );
         this.idTokenClaims = this.userAccount.idTokenClaims;
 
         const activeAccount = this.authService.instance.getActiveAccount();
@@ -157,7 +167,13 @@ export class BusAdminComponent implements OnInit {
 
         console.log('Usuario cargado:', this.userAccount);
         console.log('ID Token Claims:', this.idTokenClaims);
-        this.getAccessToken();
+
+        if (this.idTokenClaims) {
+          this.fullName =
+            this.idTokenClaims.given_name +
+            ' ' +
+            this.idTokenClaims.family_name;
+        }
       } else {
         this.router.navigate(['/']);
       }
@@ -176,22 +192,68 @@ export class BusAdminComponent implements OnInit {
       .subscribe({
         next: (result: AuthenticationResult) => {
           this.accessToken = result.accessToken;
-          console.log('Access Token obtenido:', this.accessToken);
           console.log('Scopes:', result.scopes);
           console.log('Expira en:', result.expiresOn);
         },
         error: (error) => {
           console.error('Error al obtener access token:', error);
 
-          // Intentar con login interactivo si falla el silencioso
-          this.authService.acquireTokenRedirect({
-            scopes: [environment.msalClientId],
+          this.authService.logoutRedirect({
+            postLogoutRedirectUri: 'http://localhost:4200',
           });
         },
       });
   }
 
+  toggleProfile() {
+    this.isProfileOpen = !this.isProfileOpen;
+  }
+
+  logout(): void {
+    this.authService.logoutRedirect({
+      postLogoutRedirectUri: 'http://localhost:4200',
+    });
+  }
+
+  loadBuses(): void {
+    this.vehicleService.getAll().subscribe({
+      next: (response) => {
+        if (response) {
+          this.buses = response;
+          console.log('Vehículos cargados:', response);
+        }
+      },
+      error: (err) => {
+        console.error('Error al cargar vehículos:', err);
+        this.authService.logoutRedirect({
+          postLogoutRedirectUri: 'http://localhost:4200',
+        });
+      },
+    });
+  }
+
+  initForm() {
+    this.busForm = this.fb.group({
+      id: [''],
+      plate: [
+        '',
+        [Validators.required, Validators.pattern(/^[A-Z]{2,4}-?[0-9]{2,4}$/i)],
+      ],
+      lineName: ['', [Validators.required]],
+      status: [VehicleStatus.ACTIVE, [Validators.required]],
+      latitude: [-33.448],
+      longitude: [-70.669],
+    });
+  }
+
+  goToDashboard() {
+    this.router.navigate(['/dashboard']);
+  }
+
   ngOnInit(): void {
     this.loadUserInfo();
+    this.getAccessToken();
+    this.loadBuses();
+    this.initForm();
   }
 }
